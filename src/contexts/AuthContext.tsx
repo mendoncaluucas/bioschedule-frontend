@@ -24,17 +24,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(email: string, senha: string) {
     try {
-      // ⚠️ IMPORTANTE: Ajuste '/auth/login' para a rota exata do seu backend
       const response = await api.post('/auth/login', { 
         email, 
         senha 
       });
 
-      // ⚠️ IMPORTANTE: Ajuste 'access_token' para o nome exato que seu backend devolve (ex: 'token')
-      const { access_token } = response.data; 
+      // ✨ A MÁGICA: Agora extraímos o access_token E o usuario
+      const { access_token, usuario } = response.data; 
 
       if (access_token) {
         localStorage.setItem('@BioSchedule:token', access_token);
+        
+        // ✨ Salvamos o usuário no formato JSON para as outras telas lerem
+        if (usuario) {
+          localStorage.setItem('@BioSchedule:user', JSON.stringify(usuario));
+        }
+
         setIsAuthenticated(true);
         navigate('/dashboard');
       }
@@ -51,7 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    // ✨ Limpamos as duas chaves para não deixar rastros
     localStorage.removeItem('@BioSchedule:token');
+    localStorage.removeItem('@BioSchedule:user');
     setIsAuthenticated(false);
     navigate('/');
   }

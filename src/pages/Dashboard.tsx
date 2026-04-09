@@ -27,13 +27,32 @@ export function Dashboard() {
   const [dadosGrafico, setDadosGrafico] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
 
+  // Estado que vai guardar o nome final formatado
+  const [usuarioNome, setUsuarioNome] = useState('Profissional');
+
   useEffect(() => {
     async function carregarDashboard() {
       try {
         setCarregando(true);
+
+        // --- BUSCA O USUÁRIO E DEFINE O TÍTULO PELA ROLE ---
+        const usuarioSalvo = localStorage.getItem('@BioSchedule:user');
+        if (usuarioSalvo) {
+          const dados = JSON.parse(usuarioSalvo);
+          const primeiroNome = dados.nome?.split(' ')[0] || 'Profissional';
+          
+          if (dados.role === 'ADMIN' || dados.role === 'PROFISSIONAL') {
+            const ultimaLetra = primeiroNome.slice(-1).toLowerCase();
+            const prefixo = ultimaLetra === 'a' ? 'Dra.' : 'Dr.';
+            setUsuarioNome(`${prefixo} ${primeiroNome}`);
+          } else {
+            setUsuarioNome(primeiroNome);
+          }
+        }
+
+        // --- BUSCA OS DADOS DA AGENDA ---
         const resAgenda = await api.get('/agendamento');
 
-        // --- LÓGICA 1: FILTROS DE HOJE E DO MÊS ---
         const hoje = new Date();
         const mesAtual = hoje.getMonth();
         const anoAtual = hoje.getFullYear();
@@ -46,19 +65,19 @@ export function Dashboard() {
           
           const dataAg = new Date(ag.data_inicio);
 
-          // 1. Calcula o faturamento REAL do Mês (Apenas os CONCLUÍDOS)
+          // Cálculo do faturamento mensal (apenas CONCLUIDOS)
           if (dataAg.getMonth() === mesAtual && dataAg.getFullYear() === anoAtual) {
             if (ag.status === 'CONCLUIDO') {
               ganhoMesReal += ag.servico?.valor ? Number(ag.servico.valor) : 0;
             }
           }
 
-          // 2. Verifica se o agendamento é EXATAMENTE HOJE
+          // Verificação se o agendamento é hoje
           const isHoje = dataAg.getDate() === hoje.getDate() && 
                          dataAg.getMonth() === hoje.getMonth() && 
                          dataAg.getFullYear() === hoje.getFullYear();
 
-          // 3. Soma na previsão de hoje (apenas se não foi cancelado ou faltou)
+          // Cálculo da previsão do dia (exclui CANCELADOS e FALTAS)
           if (isHoje && ag.status !== 'CANCELADO' && ag.status !== 'FALTOU') {
             previsaoHoje += ag.servico?.valor ? Number(ag.servico.valor) : 0;
           }
@@ -66,7 +85,7 @@ export function Dashboard() {
           return isHoje && ag.status !== 'CANCELADO';
         });
 
-        // Ordenar os agendamentos de hoje por hora
+        // Ordena a agenda do dia por horário
         hojeAgendamentos.sort((a: any, b: any) => 
           new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime()
         );
@@ -75,9 +94,9 @@ export function Dashboard() {
         setFaturacaoHoje(previsaoHoje);
         setFaturamentoMes(ganhoMesReal);
 
-        // --- LÓGICA 2: DADOS REAIS PARA O GRÁFICO (SEMANA ATUAL) ---
+        // --- LÓGICA DO GRÁFICO DA SEMANA ---
         const diasSemanaNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-        const contadoresSemana = { 'Seg': 0, 'Ter': 0, 'Qua': 0, 'Qui': 0, 'Sex': 0, 'Sáb': 0 }; // Removemos domingo visualmente se quiser, ou mantemos
+        const contadoresSemana = { 'Seg': 0, 'Ter': 0, 'Qua': 0, 'Qui': 0, 'Sex': 0, 'Sáb': 0 };
 
         const agora = new Date();
         const inicioSemana = new Date(agora);
@@ -129,9 +148,8 @@ export function Dashboard() {
   return (
     <div className="space-y-8 pb-10 max-w-6xl mx-auto">
       
-      {/* HEADER COM DEGRADÊ ANIMADO */}
+      {/* HEADER DINÂMICO */}
       <div className="relative bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 rounded-[2.5rem] p-10 overflow-hidden shadow-2xl shadow-blue-600/20 animate-slide-up">
-        {/* Efeito visual de fundo (Círculos) */}
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-white opacity-10 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-blue-400 opacity-20 rounded-full blur-2xl"></div>
         
@@ -140,7 +158,7 @@ export function Dashboard() {
             <Sparkles size={16} className="animate-pulse" /> Visão Geral da Clínica
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-2">
-            Olá, Dra. Geovana! <span className="inline-block animate-wave origin-bottom-right">👋</span>
+            Olá, {usuarioNome}! <span className="inline-block animate-wave origin-bottom-right">👋</span>
           </h1>
           <p className="text-blue-100 text-lg max-w-xl font-medium">
             Aqui está o resumo financeiro e a sua agenda para hoje.
@@ -148,10 +166,8 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* CARDS DE RESUMO (KPIs com animação) */}
+      {/* CARDS INDICADORES */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Card 1: Agendamentos */}
         <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-slide-up delay-100 relative overflow-hidden group flex items-center gap-6">
           <div className="absolute -right-6 -top-6 bg-slate-50 w-32 h-32 rounded-full transition-transform group-hover:scale-150 duration-500 z-0"></div>
           <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl relative z-10 shadow-inner group-hover:bg-blue-600 group-hover:text-white transition-colors">
@@ -163,7 +179,6 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Card 2: Previsão Hoje */}
         <div className="bg-gradient-to-br from-blue-600 to-indigo-800 p-8 rounded-[2rem] shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-slide-up delay-200 flex items-center gap-6 text-white relative overflow-hidden group">
           <TrendingUp size={120} className="absolute -right-6 -bottom-6 opacity-10 transition-transform group-hover:scale-110 group-hover:-rotate-12 duration-500" />
           <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm relative z-10 shadow-inner">
@@ -177,7 +192,6 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Card 3: Faturamento Mês */}
         <div className="bg-gradient-to-br from-emerald-500 to-teal-700 p-8 rounded-[2rem] shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-slide-up delay-300 flex items-center gap-6 text-white relative overflow-hidden group">
           <CheckCircle size={120} className="absolute -right-6 -bottom-6 opacity-10 transition-transform group-hover:scale-110 group-hover:rotate-12 duration-500" />
           <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm relative z-10 shadow-inner">
@@ -190,18 +204,17 @@ export function Dashboard() {
             </h2>
           </div>
         </div>
-
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* GRÁFICO DA SEMANA (RECHARTS ESTILIZADO) */}
+        {/* GRÁFICO DA SEMANA */}
         <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 animate-slide-up delay-400">
           <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
             <TrendingUp className="text-blue-600" /> Atendimentos na Semana Atual
           </h3>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full h-80 min-h-[300px]">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={dadosGrafico} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
@@ -238,7 +251,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* PRÓXIMOS ATENDIMENTOS DE HOJE */}
+        {/* AGENDA DE HOJE MINIATURA */}
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col h-[400px] animate-slide-up delay-500">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -274,12 +287,10 @@ export function Dashboard() {
             )}
           </div>
         </div>
-
       </div>
 
-      {/* CLASSES DE ANIMAÇÃO GLOBAIS */}
+      {/* ESTILOS CUSTOMIZADOS (CSS) */}
       <style>{`
-        /* Animação do aceno de mão */
         @keyframes wave {
           0%, 100% { transform: rotate(0deg); }
           25% { transform: rotate(-20deg); }
@@ -287,22 +298,16 @@ export function Dashboard() {
           75% { transform: rotate(-15deg); }
         }
         .animate-wave { animation: wave 2.5s infinite; transform-origin: 70% 70%; display: inline-block; }
-
-        /* Animação de entrada fluida (Slide Up) */
         @keyframes slideUpFade {
           0% { opacity: 0; transform: translateY(30px); }
           100% { opacity: 1; transform: translateY(0); }
         }
         .animate-slide-up { animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
-        
-        /* Atrasos em cascata para os blocos */
         .delay-100 { animation-delay: 100ms; }
         .delay-200 { animation-delay: 200ms; }
         .delay-300 { animation-delay: 300ms; }
         .delay-400 { animation-delay: 400ms; }
         .delay-500 { animation-delay: 500ms; }
-
-        /* Scrollbar customizada para a listagem de hoje */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }

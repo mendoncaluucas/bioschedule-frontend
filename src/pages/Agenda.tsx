@@ -32,7 +32,6 @@ export function Agenda() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // --- ESTADOS DO MODAL DE NOVO AGENDAMENTO ---
   const [dataSelecionada, setDataSelecionada] = useState('');
   const [horariosDisponiveis, setHorariosDisponiveis] = useState<string[]>([]);
   const [formData, setFormData] = useState({
@@ -41,18 +40,15 @@ export function Agenda() {
     horaSelecionada: '' 
   });
 
-  // O estado selecaoAberta agora suporta a escolha da data do filtro principal
   const [selecaoAberta, setSelecaoAberta] = useState<'paciente' | 'servico' | 'data_filtro' | null>(null);
   const [buscaSelecao, setBuscaSelecao] = useState('');
 
-  // --- ESTADO DO FILTRO DA TELA PRINCIPAL ---
   const hoje = new Date();
   const formatarDataInput = (data: Date) => {
     return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`;
   };
   const [dataFiltroPrincipal, setDataFiltroPrincipal] = useState(formatarDataInput(hoje));
 
-  // --- LÓGICA DO CALENDÁRIO CUSTOMIZADO DO MODAL DE AGENDAMENTO ---
   const dataMinima = formatarDataInput(hoje);
   const hojeMeiaNoite = new Date();
   hojeMeiaNoite.setHours(0, 0, 0, 0); 
@@ -79,7 +75,6 @@ export function Agenda() {
     return grid;
   }, [mesReferencia]);
 
-  // --- LÓGICA DO CALENDÁRIO CUSTOMIZADO DO FILTRO PRINCIPAL ---
   const [mesReferenciaFiltro, setMesReferenciaFiltro] = useState(new Date(hojeMeiaNoite.getFullYear(), hojeMeiaNoite.getMonth(), 1));
   
   const mudarMesFiltro = (offset: number) => {
@@ -119,7 +114,6 @@ export function Agenda() {
     }
   }
 
-  // --- MOTOR DE DISPONIBILIDADE DO MODAL ---
   useEffect(() => {
     if (!dataSelecionada || !formData.servicoId || configs.length === 0) {
       setHorariosDisponiveis([]);
@@ -154,7 +148,6 @@ export function Agenda() {
     const horaAtualMinutos = agora.getHours() * 60 + agora.getMinutes();
 
     for (let min = inicioExpediente; min + duracao <= fimExpediente; min += 10) {
-      
       if (dataSelecionada === dataMinima && min <= horaAtualMinutos) continue;
       if (min + duracao > almocoInicio && min < almocoFim) continue;
 
@@ -183,18 +176,25 @@ export function Agenda() {
   }, [dataSelecionada, formData.servicoId, agendamentos, servicos, configs, dataMinima]);
 
 
+  // ✨ CORREÇÃO AQUI: INJETANDO O PROFISSIONAL LOGADO
   async function handleSalvar(e: React.FormEvent) {
     e.preventDefault();
     try {
+      // 1. Pesca o usuário logado
+      const usuarioSalvo = localStorage.getItem('@BioSchedule:user');
+      const usuarioLogado = usuarioSalvo ? JSON.parse(usuarioSalvo) : null;
+
       const servicoSelecionado = servicos.find(s => s.id === formData.servicoId);
       const duracao = servicoSelecionado?.duracao_minutos || 60;
 
       const dataInicioObj = new Date(`${dataSelecionada}T${formData.horaSelecionada}:00`);
       const dataFimObj = new Date(dataInicioObj.getTime() + duracao * 60000);
 
+      // 2. Envia para a API com o profissionalId
       await api.post('/agendamento', {
         pacienteId: formData.pacienteId,
         servicoId: formData.servicoId,
+        profissionalId: usuarioLogado?.id, // <-- A MÁGICA ACONTECE AQUI
         data_inicio: dataInicioObj.toISOString(),
         data_fim: dataFimObj.toISOString() 
       });
@@ -221,7 +221,6 @@ export function Agenda() {
     }
   }
 
-  // --- LÓGICA DE FILTRAGEM DA TELA PRINCIPAL ---
   const mudarDiaFiltro = (dias: number) => {
     const dataAtual = new Date(dataFiltroPrincipal + 'T12:00:00');
     dataAtual.setDate(dataAtual.getDate() + dias);
@@ -274,7 +273,6 @@ export function Agenda() {
         </button>
       </header>
 
-      {/* BARRA DE FILTRO DE DATA */}
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4 animate-slide-up delay-100">
         <div className="flex items-center gap-2">
           <CalendarSearch className="text-slate-400 mr-2" size={24} />
@@ -316,7 +314,6 @@ export function Agenda() {
           const hora = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
           const dataFormatada = data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
-          // Calcula um delay progressivo para os cards
           const delayClass = `delay-${Math.min((index + 2) * 100, 500)}`;
 
           return (
@@ -372,7 +369,6 @@ export function Agenda() {
         )}
       </div>
 
-      {/* MODAL DE NOVO AGENDAMENTO */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-40">
           
@@ -549,9 +545,6 @@ export function Agenda() {
         </div>
       )}
 
-      {/* =========================================================================
-          TELA CENTRAL ESCURA MULTIUSO (PACIENTE, SERVIÇO OU FILTRO DE DATA)
-          ========================================================================= */}
       {selecaoAberta && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
           <div className="bg-white rounded-[2rem] p-6 w-full max-w-md shadow-2xl flex flex-col max-h-[80vh] scale-in">

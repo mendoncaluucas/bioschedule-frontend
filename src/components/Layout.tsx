@@ -1,11 +1,18 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Calendar, Users, TrendingUp, Scissors, LogOut, ShieldCheck, Settings } from 'lucide-react';
+import { 
+  Calendar, Users, TrendingUp, Scissors, LogOut, 
+  ShieldCheck, Settings, FileText, Shield 
+} from 'lucide-react';
 import { useContext } from 'react';
-import { AuthContext } from '../contexts/AuthContext'; // 1. Importa o Contexto
+import { AuthContext } from '../contexts/AuthContext'; 
 
 export function Layout() {
   const location = useLocation();
-  const { logout } = useContext(AuthContext); // 2. Puxa a função de deslogar
+  const { logout } = useContext(AuthContext); 
+
+  // Pega o usuário do localStorage para validar a Role
+  const usuarioSalvo = localStorage.getItem('@BioSchedule:user');
+  const user = usuarioSalvo ? JSON.parse(usuarioSalvo) : null;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -31,12 +38,23 @@ export function Layout() {
           <Link to="/servicos" className={`flex items-center gap-3 p-4 rounded-2xl transition-all font-medium ${isActive('/servicos') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
             <Scissors size={20} /> Procedimentos
           </Link>
+          
+          <Link to="/relatorios" className={`flex items-center gap-3 p-4 rounded-2xl transition-all font-medium ${isActive('/relatorios') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+            <FileText size={20} /> Relatórios
+          </Link>
+
+          {/* ✨ LINK DA EQUIPE (Aparece apenas para ADMIN) */}
+          {user?.role === 'ADMIN' && (
+            <Link to="/equipe" className={`flex items-center gap-3 p-4 rounded-2xl transition-all font-medium ${isActive('/equipe') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+              <Shield size={20} /> Equipe
+            </Link>
+          )}
+
           <Link to="/configuracoes" className={`flex items-center gap-3 p-4 rounded-2xl transition-all font-medium ${isActive('/configuracoes') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
             <Settings size={20} /> Configurações
           </Link>
         </nav>
 
-        {/* 3. Coloca o onClick={logout} aqui no botão de Sair */}
         <button 
           onClick={logout}
           className="flex items-center gap-3 p-4 rounded-2xl transition-all font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 mt-auto"
@@ -45,8 +63,7 @@ export function Layout() {
         </button>
       </aside>
 
-      {/* ÁREA CENTRAL (Onde as telas aparecem) */}
-      <main className="flex-1 p-10 overflow-y-auto h-screen relative">
+      <main className="flex-1 p-10 overflow-y-auto h-screen relative custom-scrollbar">
         <div className="max-w-6xl mx-auto">
           <Outlet />
         </div>
