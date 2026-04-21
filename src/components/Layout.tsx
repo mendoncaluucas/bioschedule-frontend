@@ -10,10 +10,6 @@ export function Layout() {
   const location = useLocation();
   const { logout } = useContext(AuthContext); 
 
-  // Pega o usuário do localStorage para validar a Role
-  const usuarioSalvo = localStorage.getItem('@BioSchedule:user');
-  const user = usuarioSalvo ? JSON.parse(usuarioSalvo) : null;
-
   const isActive = (path: string) => location.pathname === path;
 
   return (
@@ -43,12 +39,10 @@ export function Layout() {
             <FileText size={20} /> Relatórios
           </Link>
 
-          {/* ✨ LINK DA EQUIPE (Aparece apenas para ADMIN) */}
-          {user?.role === 'ADMIN' && (
-            <Link to="/equipe" className={`flex items-center gap-3 p-4 rounded-2xl transition-all font-medium ${isActive('/equipe') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-              <Shield size={20} /> Equipe
-            </Link>
-          )}
+          {/* Link da Equipe sempre visível */}
+          <Link to="/equipe" className={`flex items-center gap-3 p-4 rounded-2xl transition-all font-medium ${isActive('/equipe') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+            <Shield size={20} /> Equipe
+          </Link>
 
           <Link to="/configuracoes" className={`flex items-center gap-3 p-4 rounded-2xl transition-all font-medium ${isActive('/configuracoes') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
             <Settings size={20} /> Configurações
@@ -63,6 +57,7 @@ export function Layout() {
         </button>
       </aside>
 
+      {/* ÁREA CENTRAL */}
       <main className="flex-1 p-10 overflow-y-auto h-screen relative custom-scrollbar">
         <div className="max-w-6xl mx-auto">
           <Outlet />

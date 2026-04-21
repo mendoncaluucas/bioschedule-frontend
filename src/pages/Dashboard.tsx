@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { api } from '../services/api';
 import { Link } from 'react-router-dom';
 import { 
@@ -8,7 +8,9 @@ import {
   Clock, 
   ArrowRight,
   CheckCircle,
-  Sparkles
+  Sparkles,
+  CalendarDays,
+  Filter
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -21,26 +23,23 @@ import {
 } from 'recharts';
 
 export function Dashboard() {
-  const [agendamentosHoje, setAgendamentosHoje] = useState<any[]>([]);
-  const [faturacaoHoje, setFaturacaoHoje] = useState(0);
-  const [faturamentoMes, setFaturamentoMes] = useState(0); 
-  const [dadosGrafico, setDadosGrafico] = useState<any[]>([]);
+  const [agendamentosFull, setAgendamentosFull] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
-
-  // Estado que vai guardar o nome final formatado
   const [usuarioNome, setUsuarioNome] = useState('Profissional');
+
+  // ✨ NOVOS ESTADOS PARA O FILTRO
+  const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes' | 'custom'>('hoje');
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
 
   useEffect(() => {
     async function carregarDashboard() {
       try {
         setCarregando(true);
-
-        // --- BUSCA O USUÁRIO E DEFINE O TÍTULO PELA ROLE ---
         const usuarioSalvo = localStorage.getItem('@BioSchedule:user');
         if (usuarioSalvo) {
           const dados = JSON.parse(usuarioSalvo);
           const primeiroNome = dados.nome?.split(' ')[0] || 'Profissional';
-          
           if (dados.role === 'ADMIN' || dados.role === 'PROFISSIONAL') {
             const ultimaLetra = primeiroNome.slice(-1).toLowerCase();
             const prefixo = ultimaLetra === 'a' ? 'Dra.' : 'Dr.';
@@ -50,91 +49,78 @@ export function Dashboard() {
           }
         }
 
-        // --- BUSCA OS DADOS DA AGENDA ---
         const resAgenda = await api.get('/agendamento');
-
-        const hoje = new Date();
-        const mesAtual = hoje.getMonth();
-        const anoAtual = hoje.getFullYear();
-
-        let previsaoHoje = 0;
-        let ganhoMesReal = 0;
-
-        const hojeAgendamentos = resAgenda.data.filter((ag: any) => {
-          if (!ag.data_inicio) return false;
-          
-          const dataAg = new Date(ag.data_inicio);
-
-          // Cálculo do faturamento mensal (apenas CONCLUIDOS)
-          if (dataAg.getMonth() === mesAtual && dataAg.getFullYear() === anoAtual) {
-            if (ag.status === 'CONCLUIDO') {
-              ganhoMesReal += ag.servico?.valor ? Number(ag.servico.valor) : 0;
-            }
-          }
-
-          // Verificação se o agendamento é hoje
-          const isHoje = dataAg.getDate() === hoje.getDate() && 
-                         dataAg.getMonth() === hoje.getMonth() && 
-                         dataAg.getFullYear() === hoje.getFullYear();
-
-          // Cálculo da previsão do dia (exclui CANCELADOS e FALTAS)
-          if (isHoje && ag.status !== 'CANCELADO' && ag.status !== 'FALTOU') {
-            previsaoHoje += ag.servico?.valor ? Number(ag.servico.valor) : 0;
-          }
-
-          return isHoje && ag.status !== 'CANCELADO';
-        });
-
-        // Ordena a agenda do dia por horário
-        hojeAgendamentos.sort((a: any, b: any) => 
-          new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime()
-        );
-
-        setAgendamentosHoje(hojeAgendamentos);
-        setFaturacaoHoje(previsaoHoje);
-        setFaturamentoMes(ganhoMesReal);
-
-        // --- LÓGICA DO GRÁFICO DA SEMANA ---
-        const diasSemanaNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-        const contadoresSemana = { 'Seg': 0, 'Ter': 0, 'Qua': 0, 'Qui': 0, 'Sex': 0, 'Sáb': 0 };
-
-        const agora = new Date();
-        const inicioSemana = new Date(agora);
-        inicioSemana.setDate(agora.getDate() - agora.getDay());
-        inicioSemana.setHours(0, 0, 0, 0);
-
-        const fimSemana = new Date(inicioSemana);
-        fimSemana.setDate(inicioSemana.getDate() + 6);
-        fimSemana.setHours(23, 59, 59, 999);
-
-        resAgenda.data.forEach((ag: any) => {
-          if (ag.data_inicio && ag.status !== 'CANCELADO') {
-            const dataAg = new Date(ag.data_inicio);
-            if (dataAg >= inicioSemana && dataAg <= fimSemana) {
-              const nomeDia = diasSemanaNomes[dataAg.getDay()];
-              if (contadoresSemana[nomeDia as keyof typeof contadoresSemana] !== undefined) {
-                contadoresSemana[nomeDia as keyof typeof contadoresSemana]++;
-              }
-            }
-          }
-        });
-
-        const dadosReaisGrafico = Object.keys(contadoresSemana).map(dia => ({
-          nome: dia,
-          atendimentos: contadoresSemana[dia as keyof typeof contadoresSemana]
-        }));
-
-        setDadosGrafico(dadosReaisGrafico);
-
+        setAgendamentosFull(resAgenda.data);
       } catch (error) {
         console.error("Erro ao carregar dados do dashboard:", error);
       } finally {
         setCarregando(false);
       }
     }
-
     carregarDashboard();
   }, []);
+
+  // ✨ LÓGICA DE FILTRAGEM E CÁLCULOS DINÂMICOS (Baseado no seu código original)
+  const stats = useMemo(() => {
+    const agora = new Date();
+    let inicio = new Date();
+    let fim = new Date();
+
+    if (periodo === 'hoje') {
+      inicio.setHours(0, 0, 0, 0);
+      fim.setHours(23, 59, 59, 999);
+    } else if (periodo === 'semana') {
+      inicio.setDate(agora.getDate() - agora.getDay());
+      inicio.setHours(0, 0, 0, 0);
+      fim.setDate(inicio.getDate() + 6);
+      fim.setHours(23, 59, 59, 999);
+    } else if (periodo === 'mes') {
+      inicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
+      fim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0, 23, 59, 59);
+    } else if (periodo === 'custom' && dataInicio && dataFim) {
+      inicio = new Date(dataInicio + 'T00:00:00');
+      fim = new Date(dataFim + 'T23:59:59');
+    }
+
+    const filtrados = agendamentosFull.filter(ag => {
+      const d = new Date(ag.data_inicio);
+      return d >= inicio && d <= fim && ag.status !== 'CANCELADO';
+    });
+
+    const faturamentoReal = filtrados
+      .filter(ag => ag.status === 'CONCLUIDO')
+      .reduce((acc, ag) => acc + (ag.servico?.valor ? Number(ag.servico.valor) : 0), 0);
+
+    const faturamentoPrevisto = filtrados
+      .filter(ag => ag.status !== 'FALTOU')
+      .reduce((acc, ag) => acc + (ag.servico?.valor ? Number(ag.servico.valor) : 0), 0);
+
+    // Lógica do Gráfico Adaptativa
+    const diasSemanaNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const contadores: any = {};
+    
+    filtrados.forEach(ag => {
+      const d = new Date(ag.data_inicio);
+      const label = periodo === 'mes' ? d.getDate().toString() : diasSemanaNomes[d.getDay()];
+      contadores[label] = (contadores[label] || 0) + 1;
+    });
+
+    const dadosGraficoFormatado = (periodo === 'mes' 
+      ? Object.keys(contadores).sort((a, b) => Number(a) - Number(b))
+      : ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+    ).map(label => ({
+      nome: label,
+      atendimentos: contadores[label] || 0
+    }));
+
+    return {
+      filtrados: filtrados.sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime()),
+      faturamentoReal,
+      faturamentoPrevisto,
+      totalAgendamentos: filtrados.length,
+      grafico: dadosGraficoFormatado
+    };
+  }, [agendamentosFull, periodo, dataInicio, dataFim]);
 
   if (carregando) {
     return (
@@ -148,23 +134,54 @@ export function Dashboard() {
   return (
     <div className="space-y-8 pb-10 max-w-6xl mx-auto">
       
-      {/* HEADER DINÂMICO */}
+      {/* HEADER DINÂMICO COM FILTRO INTEGRADO */}
       <div className="relative bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 rounded-[2.5rem] p-10 overflow-hidden shadow-2xl shadow-blue-600/20 animate-slide-up">
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-white opacity-10 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-blue-400 opacity-20 rounded-full blur-2xl"></div>
         
-        <div className="relative z-10 text-white">
-          <div className="flex items-center gap-2 mb-2 opacity-80 font-medium tracking-wider uppercase text-sm">
-            <Sparkles size={16} className="animate-pulse" /> Visão Geral da Clínica
+        <div className="relative z-10 text-white flex flex-col md:flex-row justify-between items-center gap-6">
+          <div>
+            <div className="flex items-center gap-2 mb-2 opacity-80 font-medium tracking-wider uppercase text-sm">
+              <Sparkles size={16} className="animate-pulse" /> Visão Geral da Clínica
+            </div>
+            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-2">
+              Olá, {usuarioNome}! <span className="inline-block animate-wave origin-bottom-right">👋</span>
+            </h1>
+            <p className="text-blue-100 text-lg max-w-xl font-medium">
+              Acompanhe o desempenho do seu negócio em tempo real.
+            </p>
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-2">
-            Olá, {usuarioNome}! <span className="inline-block animate-wave origin-bottom-right">👋</span>
-          </h1>
-          <p className="text-blue-100 text-lg max-w-xl font-medium">
-            Aqui está o resumo financeiro e a sua agenda para hoje.
-          </p>
+
+          {/* ✨ SELECTOR DE PERÍODO ESTILO GLASSMORPHISM */}
+          <div className="bg-white/10 backdrop-blur-md p-1.5 rounded-3xl border border-white/20 flex gap-1">
+            {(['hoje', 'semana', 'mes', 'custom'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriodo(p)}
+                className={`px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
+                  periodo === p ? 'bg-white text-blue-700 shadow-xl scale-105' : 'text-white hover:bg-white/10'
+                }`}
+              >
+                {p === 'custom' ? <Filter size={16} /> : p}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* FILTRO PERSONALIZADO */}
+      {periodo === 'custom' && (
+        <div className="bg-white p-6 rounded-[2rem] border border-blue-100 shadow-sm flex flex-wrap gap-4 animate-slide-up">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Início</label>
+            <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-700" />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Fim</label>
+            <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-700" />
+          </div>
+        </div>
+      )}
 
       {/* CARDS INDICADORES */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -174,8 +191,8 @@ export function Dashboard() {
             <CalendarIcon size={32} />
           </div>
           <div className="relative z-10">
-            <p className="text-slate-400 font-bold uppercase tracking-wider text-xs mb-1">Agendamentos Hoje</p>
-            <h2 className="text-4xl font-black text-slate-800 tracking-tight">{agendamentosHoje.length}</h2>
+            <p className="text-slate-400 font-bold uppercase tracking-wider text-xs mb-1">Agendamentos</p>
+            <h2 className="text-4xl font-black text-slate-800 tracking-tight">{stats.totalAgendamentos}</h2>
           </div>
         </div>
 
@@ -185,9 +202,9 @@ export function Dashboard() {
             <DollarSign size={32} />
           </div>
           <div className="relative z-10">
-            <p className="text-blue-200 font-bold uppercase tracking-wider text-xs mb-1">Previsão Hoje</p>
+            <p className="text-blue-200 font-bold uppercase tracking-wider text-xs mb-1">Previsão Bruta</p>
             <h2 className="text-3xl font-black tracking-tight">
-              R$ {faturacaoHoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {stats.faturamentoPrevisto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </h2>
           </div>
         </div>
@@ -198,9 +215,9 @@ export function Dashboard() {
             <CheckCircle size={32} />
           </div>
           <div className="relative z-10">
-            <p className="text-emerald-200 font-bold uppercase tracking-wider text-xs mb-1">Mês (Concluído)</p>
+            <p className="text-emerald-200 font-bold uppercase tracking-wider text-xs mb-1">Faturamento Real</p>
             <h2 className="text-3xl font-black tracking-tight">
-              R$ {faturamentoMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {stats.faturamentoReal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </h2>
           </div>
         </div>
@@ -211,11 +228,11 @@ export function Dashboard() {
         {/* GRÁFICO DA SEMANA */}
         <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 animate-slide-up delay-400">
           <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-            <TrendingUp className="text-blue-600" /> Atendimentos na Semana Atual
+            <TrendingUp className="text-blue-600" /> Fluxo de Atendimentos
           </h3>
           <div className="w-full h-80 min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <BarChart data={dadosGrafico} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={stats.grafico} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
                   dataKey="nome" 
@@ -251,11 +268,11 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* AGENDA DE HOJE MINIATURA */}
+        {/* AGENDA MINIATURA DINÂMICA */}
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col h-[400px] animate-slide-up delay-500">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <Clock className="text-blue-600" /> Hoje
+              <Clock className="text-blue-600" /> No Período
             </h3>
             <Link to="/agenda" className="text-blue-600 font-bold text-sm flex items-center gap-1 hover:text-blue-700 transition-colors bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100">
               Agenda <ArrowRight size={16} />
@@ -263,8 +280,8 @@ export function Dashboard() {
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
-            {agendamentosHoje.length > 0 ? (
-              agendamentosHoje.map((ag) => (
+            {stats.filtrados.length > 0 ? (
+              stats.filtrados.map((ag) => (
                 <div key={ag.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-300 hover:shadow-md transition-all group cursor-default">
                   <div className="flex justify-between items-start mb-2">
                     <span className="font-black text-blue-600 text-lg">
@@ -281,15 +298,15 @@ export function Dashboard() {
               ))
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
-                <CalendarIcon size={48} className="mb-4 text-blue-300" />
-                <p className="font-medium text-center text-sm">A agenda de hoje<br/>está livre!</p>
+                <CalendarDays size={48} className="mb-4 text-blue-300" />
+                <p className="font-medium text-center text-sm">Nenhum registro<br/>neste período!</p>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* ESTILOS CUSTOMIZADOS (CSS) */}
+      {/* ESTILOS CUSTOMIZADOS (CSS) - TUDO RESTAURADO! */}
       <style>{`
         @keyframes wave {
           0%, 100% { transform: rotate(0deg); }

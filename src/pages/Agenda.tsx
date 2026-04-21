@@ -1,6 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../services/api';
-import { Calendar, Clock, User, Plus, Check, X, Play, CheckCircle, CalendarDays, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, Sparkles, Search, CalendarSearch } from 'lucide-react';
+import { 
+  Calendar, Clock, User, Plus, Check, X, Play, CheckCircle, 
+  CalendarDays, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, 
+  Sparkles, Search, CalendarSearch, Stethoscope, Trash2 // ✨ Ícone Trash2 adicionado aqui!
+} from 'lucide-react';
 import Swal from 'sweetalert2';
 
 interface Agendamento {
@@ -8,8 +12,10 @@ interface Agendamento {
   data_inicio: string;
   data_fim: string;
   status: string;
+  profissionalId: string;
   paciente: { nome: string };
   servico: { nome: string; valor: number };
+  profissional?: { nome: string };
 }
 
 interface Paciente { id: string; nome: string; }
@@ -42,6 +48,10 @@ export function Agenda() {
 
   const [selecaoAberta, setSelecaoAberta] = useState<'paciente' | 'servico' | 'data_filtro' | null>(null);
   const [buscaSelecao, setBuscaSelecao] = useState('');
+
+  // PEGANDO O USUÁRIO LOGADO NO TOPO DO COMPONENTE
+  const usuarioSalvo = localStorage.getItem('@BioSchedule:user');
+  const usuarioLogado = usuarioSalvo ? JSON.parse(usuarioSalvo) : null;
 
   const hoje = new Date();
   const formatarDataInput = (data: Date) => {
@@ -102,10 +112,16 @@ export function Agenda() {
       const [resAgenda, resPacientes, resServicos, resConfigs] = await Promise.all([
         api.get('/agendamento'),
         api.get('/paciente'), 
-        api.get('/servico'),
+        api.get('/servicos'),
         api.get('/configuracao-agenda') 
       ]);
-      setAgendamentos(resAgenda.data);
+
+      let agendaFiltrada = resAgenda.data;
+      if (usuarioLogado?.role !== 'ADMIN') {
+        agendaFiltrada = agendaFiltrada.filter((ag: any) => ag.profissionalId === usuarioLogado.id);
+      }
+
+      setAgendamentos(agendaFiltrada);
       setPacientes(resPacientes.data);
       setServicos(resServicos.data);
       setConfigs(resConfigs.data);
@@ -176,25 +192,19 @@ export function Agenda() {
   }, [dataSelecionada, formData.servicoId, agendamentos, servicos, configs, dataMinima]);
 
 
-  // ✨ CORREÇÃO AQUI: INJETANDO O PROFISSIONAL LOGADO
   async function handleSalvar(e: React.FormEvent) {
     e.preventDefault();
     try {
-      // 1. Pesca o usuário logado
-      const usuarioSalvo = localStorage.getItem('@BioSchedule:user');
-      const usuarioLogado = usuarioSalvo ? JSON.parse(usuarioSalvo) : null;
-
       const servicoSelecionado = servicos.find(s => s.id === formData.servicoId);
       const duracao = servicoSelecionado?.duracao_minutos || 60;
 
       const dataInicioObj = new Date(`${dataSelecionada}T${formData.horaSelecionada}:00`);
       const dataFimObj = new Date(dataInicioObj.getTime() + duracao * 60000);
 
-      // 2. Envia para a API com o profissionalId
       await api.post('/agendamento', {
         pacienteId: formData.pacienteId,
         servicoId: formData.servicoId,
-        profissionalId: usuarioLogado?.id, // <-- A MÁGICA ACONTECE AQUI
+        profissionalId: usuarioLogado?.id, 
         data_inicio: dataInicioObj.toISOString(),
         data_fim: dataFimObj.toISOString() 
       });
@@ -220,6 +230,32 @@ export function Agenda() {
       Swal.fire('Erro', 'Não foi possível alterar.', 'error');
     }
   }
+
+  // ✨ NOVA FUNÇÃO DE DELETAR (Excluir do Banco)
+  const handleRemoverAgendamento = async (id: string) => {
+    const confirmacao = await Swal.fire({
+      title: 'Excluir agendamento?',
+      text: "Isso apagará o agendamento e liberará o horário na agenda. Essa ação não pode ser desfeita.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sim, excluir!',
+      cancelButtonText: 'Cancelar',
+      customClass: { popup: 'rounded-[2rem]' }
+    });
+
+    if (confirmacao.isConfirmed) {
+      try {
+        await api.delete(`/agendamento/${id}`);
+        Swal.fire({ icon: 'success', title: 'Excluído!', text: 'Agendamento removido com sucesso.', timer: 2000, showConfirmButton: false });
+        carregarDados(); // Recarrega a tela na hora para o horário voltar a ficar livre
+      } catch (error) {
+        console.error(error);
+        Swal.fire('Erro', 'Não foi possível excluir o agendamento.', 'error');
+      }
+    }
+  };
 
   const mudarDiaFiltro = (dias: number) => {
     const dataAtual = new Date(dataFiltroPrincipal + 'T12:00:00');
@@ -337,9 +373,17 @@ export function Agenda() {
                   <Play size={18} className="text-slate-400 shrink-0" />
                   <span className="truncate">{agendamento.servico?.nome}</span>
                 </div>
+                
+                {usuarioLogado?.role === 'ADMIN' && agendamento.profissional && (
+                  <div className="flex items-center gap-3 text-indigo-500 font-medium text-sm mt-1">
+                    <Stethoscope size={18} className="text-indigo-300 shrink-0" />
+                    <span className="truncate">Dr(a). {agendamento.profissional.nome.split(' ')[0]}</span>
+                  </div>
+                )}
               </div>
 
-              <div className="flex gap-2 pt-4 border-t border-slate-100 mt-auto">
+              {/* ✨ BARRA DE AÇÕES (Inclui o botão de excluir) */}
+              <div className="flex items-center gap-2 pt-4 border-t border-slate-100 mt-auto">
                 {agendamento.status === 'AGENDADO' && (
                   <button onClick={() => alterarStatus(agendamento.id, 'CONFIRMADO')} className="flex-1 bg-blue-50 text-blue-600 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors">
                     Confirmar
@@ -355,6 +399,16 @@ export function Agenda() {
                     Faltou
                   </button>
                 )}
+
+                {/* ✨ BOTÃO DE LIXEIRA AQUI */}
+                <button 
+                  onClick={() => handleRemoverAgendamento(agendamento.id)} 
+                  className="p-2.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all border border-transparent hover:border-rose-100 shrink-0"
+                  title="Excluir Agendamento"
+                >
+                  <Trash2 size={20} />
+                </button>
+
               </div>
             </div>
           );

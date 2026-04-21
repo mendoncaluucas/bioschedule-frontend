@@ -289,7 +289,7 @@ export function Pacientes() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 <div className="col-span-full">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Nome Completo</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Nome Completo *</label>
                   <input 
                     required autoFocus type="text" 
                     value={patientFormData.nome} 
@@ -299,7 +299,7 @@ export function Pacientes() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">CPF</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">CPF *</label>
                   <input 
                     required type="text" 
                     maxLength={14}
@@ -311,7 +311,7 @@ export function Pacientes() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Telefone / WhatsApp</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Telefone / WhatsApp *</label>
                   <input 
                     required type="text" 
                     maxLength={15}
@@ -322,9 +322,11 @@ export function Pacientes() {
                   />
                 </div>
 
+                {/* ✨ E-MAIL AGORA É OBRIGATÓRIO AQUI ✨ */}
                 <div className="col-span-full">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">E-mail (Opcional)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">E-mail *</label>
                   <input 
+                    required 
                     type="email" 
                     value={patientFormData.email} 
                     onChange={e => setPatientFormData({...patientFormData, email: e.target.value})} 
@@ -335,9 +337,10 @@ export function Pacientes() {
               </div>
 
               <div className="pt-4 flex justify-end">
+                {/* ✨ BOTÃO SÓ LIBERA SE TIVER O E-MAIL PREENCHIDO ✨ */}
                 <button 
                   type="submit" 
-                  disabled={salvandoPaciente || !patientFormData.nome || !patientFormData.cpf || !patientFormData.telefone} 
+                  disabled={salvandoPaciente || !patientFormData.nome || !patientFormData.cpf || !patientFormData.telefone || !patientFormData.email} 
                   className="bg-blue-600 text-white font-bold text-base px-6 py-3 rounded-xl hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:shadow-none flex items-center gap-2"
                 >
                   {salvandoPaciente ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Check size={18} />}

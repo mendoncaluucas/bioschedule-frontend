@@ -14,6 +14,7 @@ import { Servicos } from './pages/Servicos';
 import { Relatorios } from './pages/Relatorios';
 import { Equipe } from './pages/Equipe'; 
 import { Configuracoes } from './pages/Configuracoes';
+import { Agendar } from './pages/Agendar'; // ✨ IMPORTAÇÃO DA NOVA TELA
 
 // COMPONENTE DE TRAVA (PrivateRoute)
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -29,10 +30,11 @@ export function AppRoutes() {
       {/* O AuthProvider deve estar DENTRO do BrowserRouter para poder usar o useNavigate */}
       <AuthProvider>
         <Routes>
-          {/* Rota Pública */}
+          {/* 🟢 ROTAS PÚBLICAS (Qualquer pessoa pode acessar sem estar logada) */}
           <Route path="/" element={<Login />} />
+          <Route path="/agendar" element={<Agendar />} /> {/* ✨ ROTA PÚBLICA LIBERADA AQUI */}
 
-          {/* Rotas Privadas trancadas pelo <PrivateRoute> e usando o <Layout> */}
+          {/* 🔴 ROTAS PRIVADAS trancadas pelo <PrivateRoute> e usando o <Layout> */}
           <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/agenda" element={<Agenda />} />

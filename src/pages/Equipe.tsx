@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { 
   UserPlus, Shield, User, Mail, Trash2, CheckCircle, 
-  X, ShieldCheck, Stethoscope, Lock, Eye, EyeOff 
+  X, ShieldCheck, Stethoscope, Lock, Eye, EyeOff, AlertTriangle, UserCheck, ShieldAlert 
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -20,12 +20,16 @@ export function Equipe() {
     role: 'PROFISSIONAL'
   });
 
-  // ✨ Trava de Segurança: Pega o usuário logado para validar se é ADMIN
+  // Pega o usuário logado para validar se é ADMIN
   const usuarioSalvo = localStorage.getItem('@BioSchedule:user');
   const adminLogado = usuarioSalvo ? JSON.parse(usuarioSalvo) : null;
 
   useEffect(() => {
-    carregarEquipe();
+    if (adminLogado?.role === 'ADMIN') {
+      carregarEquipe();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   async function carregarEquipe() {
@@ -37,6 +41,24 @@ export function Equipe() {
       console.error("Erro ao carregar equipe:", err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  // ✨ NOVA FUNÇÃO: Aprovar acesso do profissional
+  async function handleAprovar(id: string) {
+    try {
+      await api.patch(`/usuarios/${id}`, { ativo: true });
+      Swal.fire({
+        icon: 'success',
+        title: 'Acesso Liberado!',
+        text: 'O profissional agora pode logar no sistema.',
+        timer: 2000,
+        showConfirmButton: false,
+        customClass: { popup: 'rounded-[2rem]' }
+      });
+      carregarEquipe();
+    } catch (err) {
+      Swal.fire('Erro', 'Não foi possível aprovar o acesso.', 'error');
     }
   }
 
@@ -63,9 +85,7 @@ export function Equipe() {
     }
   }
 
-  // ✨ FUNÇÃO PARA REMOVER MEMBRO
   async function handleRemover(id: string, nome: string) {
-    // Impede que o admin se delete por acidente
     if (id === adminLogado?.id) {
       Swal.fire('Ação Negada', 'Você não pode remover seu próprio usuário.', 'warning');
       return;
@@ -94,13 +114,30 @@ export function Equipe() {
     }
   }
 
-  // Se não for ADMIN, mostra tela de erro
+  // Separação de listas para a lógica de aprovação
+  const pendentes = usuarios.filter(u => !u.ativo);
+  const ativos = usuarios.filter(u => u.ativo);
+
   if (adminLogado?.role !== 'ADMIN') {
     return (
-      <div className="flex flex-col items-center justify-center h-96 text-center">
-        <Shield size={64} className="text-slate-200 mb-4" />
-        <h1 className="text-2xl font-bold text-slate-800">Acesso Restrito</h1>
-        <p className="text-slate-500">Apenas administradores podem gerenciar a equipe do sistema.</p>
+      <div className="h-[70vh] flex items-center justify-center animate-slide-up">
+        <div className="bg-white p-12 rounded-[3rem] shadow-xl border border-slate-100 text-center max-w-lg relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-50 rounded-full blur-2xl"></div>
+          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-blue-50 rounded-full blur-2xl"></div>
+
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center mb-6 shadow-inner">
+              <ShieldCheck size={40} />
+            </div>
+            <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight">Acesso Restrito</h2>
+            <p className="text-slate-500 text-lg leading-relaxed mb-8">
+              Esta área é exclusiva para <strong>Administradores</strong>.
+            </p>
+            <div className="flex items-center gap-2 text-indigo-600 font-bold bg-indigo-50 px-6 py-3 rounded-2xl">
+              <AlertTriangle size={18} /> Solicite permissão ao gestor.
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -123,14 +160,42 @@ export function Equipe() {
         </button>
       </div>
 
-      {/* GRID DE CARDS */}
+      {/* ✨ SEÇÃO DE SOLICITAÇÕES PENDENTES (Só aparece se houver alguém para aprovar) */}
+      {!loading && pendentes.length > 0 && (
+        <div className="bg-amber-50 border-2 border-amber-200 rounded-[2.5rem] p-8 animate-slide-up">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-amber-200 text-amber-700 rounded-xl">
+              <ShieldAlert size={24} />
+            </div>
+            <h2 className="text-xl font-black text-amber-900 tracking-tight">Solicitações de Acesso</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pendentes.map(p => (
+              <div key={p.id} className="bg-white p-5 rounded-2xl shadow-sm border border-amber-100 flex justify-between items-center group hover:border-amber-400 transition-all">
+                <div>
+                  <p className="font-bold text-slate-800">{p.nome}</p>
+                  <p className="text-sm text-slate-500">{p.email}</p>
+                </div>
+                <button 
+                  onClick={() => handleAprovar(p.id)}
+                  className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2 font-bold text-sm shadow-md shadow-amber-200"
+                >
+                  <UserCheck size={18} /> Aprovar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* GRID DE CARDS ATIVOS */}
       {loading ? (
         <div className="flex justify-center p-20">
           <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600"></div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {usuarios.map((user) => (
+          {ativos.map((user) => (
             <div key={user.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden group animate-slide-up hover:shadow-md transition-all">
                <div className={`absolute top-0 right-0 w-20 h-20 -mr-8 -mt-8 rounded-full opacity-10 ${user.role === 'ADMIN' ? 'bg-indigo-600' : 'bg-blue-600'}`}></div>
                
@@ -160,7 +225,7 @@ export function Equipe() {
         </div>
       )}
 
-      {/* MODAL DE CADASTRO */}
+      {/* MODAL DE CADASTRO (Fica igual) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl scale-in">

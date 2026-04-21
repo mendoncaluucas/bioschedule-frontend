@@ -27,7 +27,7 @@ export function Servicos() {
   async function carregarServicos() {
     try {
       setCarregando(true);
-      const response = await api.get('/servico');
+      const response = await api.get('/servicos'); // ✨ CORRIGIDO: /servicos
       setServicos(response.data);
     } catch (error) {
       Swal.fire('Erro', 'Não foi possível carregar os procedimentos.', 'error');
@@ -60,10 +60,10 @@ export function Servicos() {
       };
 
       if (formData.id) {
-        await api.put(`/servico/${formData.id}`, payload);
+        await api.patch(`/servicos/${formData.id}`, payload); // ✨ CORRIGIDO: /servicos e PATCH (o controller usa Patch)
         Swal.fire({ icon: 'success', title: 'Atualizado!', timer: 1500, showConfirmButton: false });
       } else {
-        await api.post('/servico', payload);
+        await api.post('/servicos', payload); // ✨ CORRIGIDO: /servicos
         Swal.fire({ icon: 'success', title: 'Cadastrado!', timer: 1500, showConfirmButton: false });
       }
       
@@ -85,7 +85,7 @@ export function Servicos() {
 
     if (confirmar.isConfirmed) {
       try {
-        await api.delete(`/servico/${id}`);
+        await api.delete(`/servicos/${id}`); // ✨ CORRIGIDO: /servicos
         setServicos(servicos.filter(s => s.id !== id));
         Swal.fire({ icon: 'success', title: 'Excluído!', timer: 1500, showConfirmButton: false, toast: true, position: 'top-end' });
       } catch (error) { 
