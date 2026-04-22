@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { 
   UserPlus, Shield, User, Mail, Trash2, CheckCircle, 
-  X, ShieldCheck, Stethoscope, Lock, Eye, EyeOff, AlertTriangle, UserCheck, ShieldAlert 
+  X, ShieldCheck, Stethoscope, Lock, Eye, EyeOff, AlertTriangle, UserCheck, ShieldAlert, ArrowUpCircle, ArrowDownCircle 
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -44,7 +44,7 @@ export function Equipe() {
     }
   }
 
-  // ✨ NOVA FUNÇÃO: Aprovar acesso do profissional
+  // ✨ FUNÇÃO: Aprovar acesso do profissional
   async function handleAprovar(id: string) {
     try {
       await api.patch(`/usuarios/${id}`, { ativo: true });
@@ -59,6 +59,46 @@ export function Equipe() {
       carregarEquipe();
     } catch (err) {
       Swal.fire('Erro', 'Não foi possível aprovar o acesso.', 'error');
+    }
+  }
+
+  // ✨ NOVA FUNÇÃO: Alterar Cargo (Role)
+  async function handleAlterarCargo(id: string, nome: string, roleAtual: string) {
+    if (id === adminLogado?.id) {
+      Swal.fire('Ação Negada', 'Você não pode alterar seu próprio nível de acesso por aqui.', 'warning');
+      return;
+    }
+
+    const novoRole = roleAtual === 'ADMIN' ? 'PROFISSIONAL' : 'ADMIN';
+    const acaoTexto = novoRole === 'ADMIN' ? 'promover a Administrador' : 'rebaixar a Profissional';
+
+    const confirmacao = await Swal.fire({
+      title: 'Alterar Permissão?',
+      text: `Deseja ${acaoTexto} o usuário ${nome}?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: novoRole === 'ADMIN' ? '#4f46e5' : '#eab308',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: `Sim, ${novoRole === 'ADMIN' ? 'Promover' : 'Rebaixar'}!`,
+      cancelButtonText: 'Cancelar',
+      customClass: { popup: 'rounded-[2rem]' }
+    });
+
+    if (confirmacao.isConfirmed) {
+      try {
+        await api.patch(`/usuarios/${id}`, { role: novoRole });
+        Swal.fire({
+          icon: 'success',
+          title: 'Permissão Atualizada!',
+          text: `O cargo foi alterado para ${novoRole}.`,
+          timer: 2000,
+          showConfirmButton: false,
+          customClass: { popup: 'rounded-[2rem]' }
+        });
+        carregarEquipe();
+      } catch (err) {
+        Swal.fire('Erro', 'Não foi possível alterar a permissão.', 'error');
+      }
     }
   }
 
@@ -160,7 +200,7 @@ export function Equipe() {
         </button>
       </div>
 
-      {/* ✨ SEÇÃO DE SOLICITAÇÕES PENDENTES (Só aparece se houver alguém para aprovar) */}
+      {/* ✨ SEÇÃO DE SOLICITAÇÕES PENDENTES */}
       {!loading && pendentes.length > 0 && (
         <div className="bg-amber-50 border-2 border-amber-200 rounded-[2.5rem] p-8 animate-slide-up">
           <div className="flex items-center gap-3 mb-6">
@@ -196,7 +236,7 @@ export function Equipe() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {ativos.map((user) => (
-            <div key={user.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden group animate-slide-up hover:shadow-md transition-all">
+            <div key={user.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden group animate-slide-up hover:shadow-md transition-all flex flex-col">
                <div className={`absolute top-0 right-0 w-20 h-20 -mr-8 -mt-8 rounded-full opacity-10 ${user.role === 'ADMIN' ? 'bg-indigo-600' : 'bg-blue-600'}`}></div>
                
                <div className="flex items-center gap-4 mb-6">
@@ -209,23 +249,39 @@ export function Equipe() {
                   </div>
                </div>
 
-               <div className="space-y-2 mb-6">
+               <div className="space-y-2 mb-6 flex-1">
                   <div className="flex items-center gap-2 text-sm text-slate-500 truncate"><Mail size={14}/> {user.email}</div>
                   <div className="flex items-center gap-2 text-sm text-emerald-600 font-bold"><CheckCircle size={14}/> Ativo no Sistema</div>
                </div>
 
-               <button 
-                onClick={() => handleRemover(user.id, user.nome)}
-                className="w-full py-3 bg-slate-50 text-slate-400 rounded-xl hover:text-rose-500 hover:bg-rose-50 transition-all flex items-center justify-center gap-2 font-bold text-sm"
-               >
-                  <Trash2 size={16} /> Remover Membro
-               </button>
+               {/* ✨ BOTOES DE AÇÃO */}
+               <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-slate-50">
+                 <button 
+                  onClick={() => handleAlterarCargo(user.id, user.nome, user.role)}
+                  className={`py-3 rounded-xl transition-all flex items-center justify-center gap-2 font-bold text-xs ${
+                    user.role === 'ADMIN' 
+                      ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' 
+                      : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                  }`}
+                  title={user.role === 'ADMIN' ? "Remover privilégios de Admin" : "Dar privilégios de Admin"}
+                 >
+                   {user.role === 'ADMIN' ? <ArrowDownCircle size={16} /> : <ArrowUpCircle size={16} />}
+                   {user.role === 'ADMIN' ? 'Remover Admin' : 'Tornar Admin'}
+                 </button>
+                 
+                 <button 
+                  onClick={() => handleRemover(user.id, user.nome)}
+                  className="py-3 bg-slate-50 text-slate-400 rounded-xl hover:text-rose-500 hover:bg-rose-50 transition-all flex items-center justify-center gap-2 font-bold text-xs"
+                 >
+                   <Trash2 size={16} /> Remover
+                 </button>
+               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* MODAL DE CADASTRO (Fica igual) */}
+      {/* MODAL DE CADASTRO */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl scale-in">
