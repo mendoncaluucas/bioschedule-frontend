@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 export const api = axios.create({
-  baseURL: 'http://localhost:3000', 
+  // Tenta ler da Vercel primeiro, se não existir (no seu PC), usa o localhost
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
 });
 
 // "Interceptor": Antes de qualquer requisição sair do React para o NestJS, ele faz isso:
