@@ -1,7 +1,7 @@
 import { useState, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import { api } from '../services/api';
-import { Lock, Mail, ArrowRight, ShieldCheck, User, Sparkles } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, User } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export function Login() {
