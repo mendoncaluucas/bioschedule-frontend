@@ -1,7 +1,8 @@
 import { useState, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import { api } from '../services/api';
-import { Lock, Mail, ArrowRight, ShieldCheck, User } from 'lucide-react';
+// Adicionado o ícone Loader2 aqui
+import { Lock, Mail, ArrowRight, ShieldCheck, User, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export function Login() {
@@ -10,16 +11,21 @@ export function Login() {
   const [senha, setSenha] = useState('');
   const [nome, setNome] = useState('');
   
+  // 1. Criado o estado de loading
+  const [isLoading, setIsLoading] = useState(false);
+  
   const { login } = useContext(AuthContext);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     
+    // 2. Inicia o loading ao clicar
+    setIsLoading(true);
+    
     if (isLogin) {
       try {
         await login(email, senha);
       } catch (err: any) {
-        // Se o erro for 403, significa que o usuário existe mas está inativo (pendente)
         const isPendente = err.response?.status === 403;
 
         Swal.fire({
@@ -34,8 +40,6 @@ export function Login() {
       }
     } else {
       try {
-        // Envia para o backend para criar o usuário
-        // O backend deve garantir que 'ativo' seja false por padrão
         await api.post('/usuarios', { 
           nome, 
           email, 
@@ -50,7 +54,7 @@ export function Login() {
           customClass: { popup: 'rounded-[2rem]' }
         });
         
-        setIsLogin(true); // Volta para o login após cadastrar
+        setIsLogin(true); 
         setNome('');
       } catch (err: any) {
         Swal.fire({
@@ -61,6 +65,9 @@ export function Login() {
         });
       }
     }
+    
+    // 3. Para o loading independente de dar certo ou erro
+    setIsLoading(false);
   }
 
   return (
@@ -103,7 +110,6 @@ export function Login() {
             <div className="lg:hidden flex justify-center mb-6">
                <ShieldCheck size={48} className="text-blue-600" />
             </div>
-            {/* CORREÇÃO DO GÊNERO AQUI */}
             <h2 className="text-4xl font-black text-slate-800 tracking-tight transition-all">
               {isLogin ? 'Bem-vindo de volta' : 'Criar nova conta'}
             </h2>
@@ -124,6 +130,7 @@ export function Login() {
                     type="text" required placeholder="Digite seu nome"
                     className="w-full py-4 pr-4 pl-12 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-medium text-slate-700 shadow-sm transition-all"
                     value={nome} onChange={e => setNome(e.target.value)}
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -139,6 +146,7 @@ export function Login() {
                   type="email" required placeholder="seu@email.com"
                   className="w-full py-4 pr-4 pl-12 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-slate-700 shadow-sm transition-all"
                   value={email} onChange={e => setEmail(e.target.value)}
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -155,16 +163,31 @@ export function Login() {
                   type="password" required placeholder="••••••••"
                   className="w-full py-4 pr-4 pl-12 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-slate-700 shadow-sm transition-all"
                   value={senha} onChange={e => setSenha(e.target.value)}
+                  disabled={isLoading}
                 />
               </div>
             </div>
 
+            {/* 4. Botão atualizado com Loading */}
             <button 
               type="submit" 
-              className={`w-full text-white font-bold py-4 rounded-2xl transition-all shadow-lg mt-4 flex items-center justify-center gap-2 group active:scale-[0.98] ${isLogin ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}
+              disabled={isLoading}
+              className={`w-full text-white font-bold py-4 rounded-2xl transition-all shadow-lg mt-4 flex items-center justify-center gap-2 group active:scale-[0.98] 
+                ${isLogin ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}
+                ${isLoading ? 'opacity-75 cursor-wait' : ''}
+              `}
             >
-              {isLogin ? 'Entrar Agora' : 'Criar minha conta'} 
-              <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              {isLoading ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  {isLogin ? 'Conectando...' : 'Cadastrando...'}
+                </>
+              ) : (
+                <>
+                  {isLogin ? 'Entrar Agora' : 'Criar minha conta'} 
+                  <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </button>
           </form>
 
@@ -172,8 +195,10 @@ export function Login() {
             <p className="text-slate-500 text-sm font-medium">
               {isLogin ? 'Ainda não tem acesso?' : 'Já possui cadastro?'} {' '}
               <button 
-                onClick={() => setIsLogin(!isLogin)}
-                className={`font-bold underline-offset-4 hover:underline transition-all ${isLogin ? 'text-blue-600' : 'text-indigo-600'}`}
+                type="button"
+                onClick={() => !isLoading && setIsLogin(!isLogin)}
+                disabled={isLoading}
+                className={`font-bold underline-offset-4 hover:underline transition-all ${isLogin ? 'text-blue-600' : 'text-indigo-600'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {isLogin ? 'Cadastre-se aqui' : 'Fazer login'}
               </button>
