@@ -14,7 +14,8 @@ import { Servicos } from './pages/Servicos';
 import { Relatorios } from './pages/Relatorios';
 import { Equipe } from './pages/Equipe'; 
 import { Configuracoes } from './pages/Configuracoes';
-import { Agendar } from './pages/Agendar'; // ✨ IMPORTAÇÃO DA NOVA TELA
+import { Agendar } from './pages/Agendar';
+import { WhatsApp } from './pages/WhatsApp';
 
 // COMPONENTE DE TRAVA (PrivateRoute)
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -32,7 +33,8 @@ export function AppRoutes() {
         <Routes>
           {/* 🟢 ROTAS PÚBLICAS (Qualquer pessoa pode acessar sem estar logada) */}
           <Route path="/" element={<Login />} />
-          <Route path="/agendar" element={<Agendar />} /> {/* ✨ ROTA PÚBLICA LIBERADA AQUI */}
+          <Route path="/agendar" element={<Agendar />} />
+          <Route path="/Agendar" element={<Navigate to="/agendar" replace />} />
 
           {/* 🔴 ROTAS PRIVADAS trancadas pelo <PrivateRoute> e usando o <Layout> */}
           <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
@@ -43,6 +45,7 @@ export function AppRoutes() {
             <Route path="/relatorios" element={<Relatorios />} />
             <Route path="/equipe" element={<Equipe />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
+            <Route path="/whatsapp" element={<WhatsApp />} />
           </Route>
 
           {/* Redirecionamento de segurança para rotas inexistentes */}

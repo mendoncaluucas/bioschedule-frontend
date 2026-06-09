@@ -16,3 +16,19 @@ api.interceptors.request.use((config) => {
   
   return config;
 });
+
+// Interceptor de RESPOSTA: Se o token expirar, redireciona pro Login automaticamente
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('@BioSchedule:token');
+      localStorage.removeItem('@BioSchedule:user');
+      // Redireciona para login se não estiver já na tela de login ou na tela pública
+      if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/agendar')) {
+        window.location.href = '/';
+      }
+    }
+    return Promise.reject(error);
+  }
+);

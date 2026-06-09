@@ -161,7 +161,7 @@ export function Agendar() {
       await api.post('/agendamento/publico', selecao);
       Swal.fire({
         icon: 'success', title: 'Agendamento Confirmado!',
-        text: 'Nossa equipe entrará em contato em breve.',
+        text: 'Você receberá a confirmação no seu WhatsApp e e-mail!',
         confirmButtonColor: '#2563eb', customClass: { popup: 'rounded-[2rem]' }
       });
       setEtapa(5); 
@@ -519,7 +519,7 @@ export function Agendar() {
                 </div>
                 <h2 className="text-4xl font-black text-slate-800 mb-4 tracking-tight">Tudo Certo, {selecao.pacienteNome.split(' ')[0]}!</h2>
                 <p className="text-slate-500 text-lg mb-8 max-w-md">
-                  Seu horário para <b>{selecao.servicoNome}</b> com <b>{selecao.profissionalNome}</b> está reservado. Verifique seu e-mail em <b>{selecao.pacienteEmail}</b>.
+                  Seu horário para <b>{selecao.servicoNome}</b> com <b>{selecao.profissionalNome}</b> está reservado. Enviamos a confirmação para o seu <b>WhatsApp</b> e <b>e-mail</b> ({selecao.pacienteEmail}).
                 </p>
                 <button onClick={() => window.location.reload()} className="px-8 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-all">
                   Novo Agendamento

@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { 
   Calendar, Users, TrendingUp, Scissors, LogOut, 
-  ShieldCheck, Settings, FileText, Shield 
+  ShieldCheck, Settings, FileText, Shield, Smartphone 
 } from 'lucide-react';
 import { useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext'; 
@@ -46,6 +46,9 @@ export function Layout() {
 
           <Link to="/configuracoes" className={`flex items-center gap-3 p-4 rounded-2xl transition-all font-medium ${isActive('/configuracoes') ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
             <Settings size={20} /> Configurações
+          </Link>
+          <Link to="/whatsapp" className={`flex items-center gap-3 p-4 rounded-2xl transition-all font-medium ${isActive('/whatsapp') ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+            <Smartphone size={20} /> WhatsApp
           </Link>
         </nav>
 
