@@ -1,4 +1,4 @@
-# 🏥 Bioschedule: Sistema Inteligente de Agendamento Full Stack
+# Bioschedule: Sistema Inteligente de Agendamento Full Stack
 
 O **Bioschedule** é uma solução completa para gestão de clínicas e profissionais liberais, desenvolvida para automatizar o fluxo de agendamentos e melhorar a comunicação com pacientes. O projeto integra uma interface administrativa robusta, um portal público de autoatendimento e notificações automatizadas via WhatsApp.
 
