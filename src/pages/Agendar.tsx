@@ -127,10 +127,10 @@ export function Agendar() {
 
   useEffect(() => {
     async function buscarHorariosReais() {
-      if (selecao.data && selecao.profissionalId) {
+      if (selecao.data && selecao.profissionalId && selecao.servicoId) {
         try {
           const response = await api.get('/agendamento/publico/horarios-disponiveis', {
-            params: { data: selecao.data, profissionalId: selecao.profissionalId }
+            params: { data: selecao.data, profissionalId: selecao.profissionalId, servicoId: selecao.servicoId }
           });
           
           let horariosLivres = response.data;
@@ -153,7 +153,7 @@ export function Agendar() {
       }
     }
     buscarHorariosReais();
-  }, [selecao.data, selecao.profissionalId]);
+  }, [selecao.data, selecao.profissionalId, selecao.servicoId]);
 
   async function handleFinalizar(e: React.FormEvent) {
     e.preventDefault();

@@ -131,65 +131,44 @@ export function Agenda() {
   }
 
   useEffect(() => {
-    if (!dataSelecionada || !formData.servicoId || configs.length === 0) {
-      setHorariosDisponiveis([]);
-      return;
-    }
-
-    const servico = servicos.find(s => s.id === formData.servicoId);
-    const dateObj = new Date(dataSelecionada + 'T12:00:00');
-    const config = configs.find(c => c.dia_semana === dateObj.getDay());
-
-    if (!servico || !config) return;
-
-    const paraMinutos = (str: string) => {
-      const [h, m] = str.split(':').map(Number);
-      return h * 60 + m;
-    };
-
-    const duracao = servico.duracao_minutos;
-    const TEMPO_DE_SOBRA = 10;
-    const inicioExpediente = paraMinutos(config.abertura);
-    const fimExpediente = paraMinutos(config.fechamento);
-    const almocoInicio = paraMinutos(config.almoco_inicio);
-    const almocoFim = paraMinutos(config.almoco_fim);
-
-    const agendamentosDoDia = agendamentos.filter(ag => {
-      if (ag.status === 'CANCELADO' || ag.status === 'FALTOU') return false;
-      return ag.data_inicio.split('T')[0] === dataSelecionada;
-    });
-
-    const slotsGerados: string[] = [];
-    const agora = new Date();
-    const horaAtualMinutos = agora.getHours() * 60 + agora.getMinutes();
-
-    for (let min = inicioExpediente; min + duracao <= fimExpediente; min += 10) {
-      if (dataSelecionada === dataMinima && min <= horaAtualMinutos) continue;
-      if (min + duracao > almocoInicio && min < almocoFim) continue;
-
-      const inicioSlot = min;
-      const fimSlot = min + duracao;
-
-      const temConflito = agendamentosDoDia.some(ag => {
-        const dIni = new Date(ag.data_inicio);
-        const dFim = new Date(ag.data_fim);
-        const agInicio = dIni.getHours() * 60 + dIni.getMinutes();
-        const agFimComSobra = (dFim.getHours() * 60 + dFim.getMinutes()) + TEMPO_DE_SOBRA;
-
-        return (inicioSlot < agFimComSobra && fimSlot > agInicio);
-      });
-
-      if (!temConflito) {
-        const h = String(Math.floor(min / 60)).padStart(2, '0');
-        const m = String(min % 60).padStart(2, '0');
-        slotsGerados.push(`${h}:${m}`);
+    async function buscarHorarios() {
+      if (!dataSelecionada || !formData.servicoId) {
+        setHorariosDisponiveis([]);
+        return;
       }
+
+      try {
+        const response = await api.get('/agendamento/publico/horarios-disponiveis', {
+          params: {
+            data: dataSelecionada,
+            profissionalId: usuarioLogado?.id,
+            servicoId: formData.servicoId,
+          },
+        });
+
+        let slots: string[] = response.data;
+
+        // Filtrar horários passados se a data for hoje
+        if (dataSelecionada === dataMinima) {
+          const agora = new Date();
+          const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+          slots = slots.filter(h => {
+            const [hora, min] = h.split(':').map(Number);
+            return hora * 60 + min > agoraMin;
+          });
+        }
+
+        setHorariosDisponiveis(slots);
+      } catch (err) {
+        console.error('Erro ao buscar horários:', err);
+        setHorariosDisponiveis([]);
+      }
+
+      setFormData(prev => ({ ...prev, horaSelecionada: '' }));
     }
 
-    setHorariosDisponiveis(slotsGerados);
-    setFormData(prev => ({ ...prev, horaSelecionada: '' }));
-
-  }, [dataSelecionada, formData.servicoId, agendamentos, servicos, configs, dataMinima]);
+    buscarHorarios();
+  }, [dataSelecionada, formData.servicoId, dataMinima, usuarioLogado?.id]);
 
 
   async function handleSalvar(e: React.FormEvent) {
