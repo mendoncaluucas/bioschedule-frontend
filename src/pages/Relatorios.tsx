@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 import { 
   FileText, 
@@ -12,7 +12,9 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  CalendarSearch
+  CalendarSearch,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -34,7 +36,11 @@ export function Relatorios() {
   const [dataFim, setDataFim] = useState(formatarDataInput(hoje));
   const [exportando, setExportando] = useState<'pdf' | 'excel' | null>(null);
 
-  // --- ESTADOS DO CALENDÁRIO CUSTOMIZADO ---
+  // Preview (contagem de registros)
+  const [preview, setPreview] = useState<{ count: number } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  // --- CALENDÁRIO CUSTOMIZADO ---
   const [calendarioAberto, setCalendarioAberto] = useState<'inicio' | 'fim' | null>(null);
   const [mesReferencia, setMesReferencia] = useState(new Date(hoje.getFullYear(), hoje.getMonth(), 1));
 
@@ -57,16 +63,44 @@ export function Relatorios() {
     return grid;
   }, [mesReferencia]);
 
+  // Buscar preview sempre que tipo ou período mudar
+  const buscarPreview = useCallback(async () => {
+    if (dataInicio > dataFim) {
+      setPreview(null);
+      return;
+    }
+    setLoadingPreview(true);
+    try {
+      const res = await api.get('/relatorios/preview', {
+        params: { tipo: tipoSelecionado, inicio: dataInicio, fim: dataFim },
+      });
+      setPreview(res.data);
+    } catch {
+      setPreview(null);
+    } finally {
+      setLoadingPreview(false);
+    }
+  }, [tipoSelecionado, dataInicio, dataFim]);
+
+  useEffect(() => {
+    buscarPreview();
+  }, [buscarPreview]);
+
   async function handleExportar(formato: 'pdf' | 'excel') {
     if (dataInicio > dataFim) {
       Swal.fire('Data Inválida', 'A data inicial não pode ser maior que a final.', 'error');
       return;
     }
 
+    if (preview?.count === 0) {
+      Swal.fire('Sem Dados', 'Não há registros para o período selecionado.', 'warning');
+      return;
+    }
+
     try {
       setExportando(formato);
       Swal.fire({
-        title: `Baixando ${formato.toUpperCase()}...`,
+        title: `Gerando ${formato.toUpperCase()}...`,
         text: 'Buscando os dados no servidor, aguarde...',
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading()
@@ -87,42 +121,76 @@ export function Relatorios() {
       window.URL.revokeObjectURL(url);
 
       Swal.fire({ icon: 'success', title: 'Download Concluído!', timer: 2000, showConfirmButton: false });
-    } catch (error) {
-      Swal.fire('Erro', `Não foi possível baixar o arquivo.`, 'error');
+    } catch {
+      Swal.fire('Erro', 'Não foi possível baixar o arquivo.', 'error');
     } finally {
       setExportando(null);
     }
   }
 
   const tipos = [
-    { id: 'financeiro', nome: 'Faturamento', desc: 'Receitas, valores por serviço e ticket médio.', icon: TrendingUp },
-    { id: 'agenda', nome: 'Agendamentos', desc: 'Consultas, faltas, cancelamentos e volume.', icon: CalendarDays },
-    { id: 'pacientes', nome: 'Pacientes', desc: 'Lista completa de pacientes cadastrados.', icon: Users }
+    { 
+      id: 'financeiro', nome: 'Faturamento', 
+      desc: 'Receitas por procedimento concluído, ticket médio e top serviços.',
+      icon: TrendingUp, 
+      color: 'blue'
+    },
+    { 
+      id: 'agenda', nome: 'Agendamentos', 
+      desc: 'Todos os agendamentos com status, paciente e profissional.',
+      icon: CalendarDays, 
+      color: 'indigo'
+    },
+    { 
+      id: 'pacientes', nome: 'Pacientes', 
+      desc: 'Lista completa de clientes cadastrados no período.',
+      icon: Users, 
+      color: 'violet'
+    }
   ] as const;
+
+  const previewLabel = () => {
+    if (dataInicio > dataFim) return { text: 'Data inicial maior que a final', warn: true };
+    if (loadingPreview) return null;
+    if (!preview) return null;
+    if (preview.count === 0) return { text: 'Nenhum registro encontrado neste período', warn: true };
+    
+    const labels: Record<string, string> = {
+      financeiro: `${preview.count} atendimento${preview.count !== 1 ? 's' : ''} concluído${preview.count !== 1 ? 's' : ''}`,
+      agenda: `${preview.count} agendamento${preview.count !== 1 ? 's' : ''}`,
+      pacientes: `${preview.count} paciente${preview.count !== 1 ? 's' : ''} cadastrado${preview.count !== 1 ? 's' : ''}`,
+    };
+    return { text: labels[tipoSelecionado], warn: false };
+  };
+
+  const labelInfo = previewLabel();
+  const semDados = preview?.count === 0 || dataInicio > dataFim;
 
   return (
     <div className="max-w-5xl mx-auto pb-10">
       
       {/* HEADER DEGRADÊ */}
       <div className="relative bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 rounded-[2.5rem] p-10 mb-10 overflow-hidden shadow-2xl animate-slide-up">
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 70% 50%, white 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
         <div className="relative z-10 text-white">
           <div className="flex items-center gap-2 mb-2 opacity-80 font-medium tracking-wider uppercase text-sm">
             <DownloadCloud size={16} /> Central de Dados
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-2">Exportar Relatórios</h1>
-          <p className="text-blue-100 text-lg max-w-xl font-medium">Extraia a inteligência da sua clínica.</p>
+          <p className="text-blue-100 text-lg max-w-xl font-medium">Extraia a inteligência da sua clínica em PDF ou Excel.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
         {/* COLUNA ESQUERDA: ESCOLHA DO TIPO */}
         <div className="lg:col-span-7 space-y-6 animate-slide-up delay-100">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">1</div>
+            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">1</div>
             <h2 className="text-xl font-bold text-slate-800">Selecione o Módulo</h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {tipos.map((tipo) => {
               const Icon = tipo.icon;
               const isSelected = tipoSelecionado === tipo.id;
@@ -130,30 +198,66 @@ export function Relatorios() {
                 <div 
                   key={tipo.id} 
                   onClick={() => setTipoSelecionado(tipo.id)} 
-                  className={`relative p-6 rounded-3xl border-2 transition-all cursor-pointer overflow-hidden group ${isSelected ? 'border-blue-500 bg-blue-50 shadow-md scale-[1.02]' : 'border-slate-100 bg-white hover:border-slate-300'}`}
+                  className={`relative p-5 rounded-3xl border-2 transition-all cursor-pointer overflow-hidden ${
+                    isSelected 
+                      ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-100 scale-[1.02]' 
+                      : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'
+                  }`}
                 >
-                  {isSelected && <CheckCircle2 size={24} className="absolute top-4 right-4 text-blue-500" />}
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${isSelected ? 'bg-blue-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500'}`}>
-                    <Icon size={28} />
+                  {isSelected && <CheckCircle2 size={20} className="absolute top-3 right-3 text-blue-500" />}
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-3 transition-all ${
+                    isSelected ? 'bg-blue-500 text-white shadow-lg shadow-blue-200' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    <Icon size={24} />
                   </div>
-                  <h3 className={`text-lg font-bold mb-1 ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>{tipo.nome}</h3>
-                  <p className={`text-sm font-medium ${isSelected ? 'text-blue-700/80' : 'text-slate-500'}`}>{tipo.desc}</p>
+                  <h3 className={`text-base font-bold mb-1 ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
+                    {tipo.nome}
+                  </h3>
+                  <p className={`text-xs font-medium leading-relaxed ${isSelected ? 'text-blue-700/80' : 'text-slate-400'}`}>
+                    {tipo.desc}
+                  </p>
                 </div>
               );
             })}
           </div>
+
+          {/* PREVIEW DE CONTAGEM */}
+          <div className={`rounded-2xl px-5 py-4 flex items-center gap-3 transition-all ${
+            loadingPreview 
+              ? 'bg-slate-50 border border-slate-100'
+              : labelInfo?.warn 
+                ? 'bg-amber-50 border border-amber-200' 
+                : 'bg-emerald-50 border border-emerald-200'
+          }`}>
+            {loadingPreview ? (
+              <>
+                <Loader2 size={18} className="text-slate-400 animate-spin shrink-0" />
+                <span className="text-sm font-medium text-slate-400">Consultando registros...</span>
+              </>
+            ) : labelInfo ? (
+              <>
+                {labelInfo.warn 
+                  ? <AlertCircle size={18} className="text-amber-500 shrink-0" />
+                  : <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />
+                }
+                <span className={`text-sm font-bold ${labelInfo.warn ? 'text-amber-700' : 'text-emerald-700'}`}>
+                  {labelInfo.text}
+                </span>
+              </>
+            ) : null}
+          </div>
         </div>
 
-        {/* COLUNA DIREITA: FILTROS PREMIUM */}
+        {/* COLUNA DIREITA: FILTROS + DOWNLOAD */}
         <div className="lg:col-span-5 space-y-8 animate-slide-up delay-200">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">2</div>
+              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">2</div>
               <h2 className="text-xl font-bold text-slate-800">Defina o Período</h2>
             </div>
 
             <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-              {/* DATA INÍCIO CUSTOMIZADA */}
+              {/* DATA INÍCIO */}
               <div className="relative">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Data Inicial</label>
                 <button 
@@ -165,7 +269,7 @@ export function Relatorios() {
                 </button>
               </div>
 
-              {/* DATA FIM CUSTOMIZADA */}
+              {/* DATA FIM */}
               <div className="relative">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Data Final</label>
                 <button 
@@ -181,26 +285,48 @@ export function Relatorios() {
 
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">3</div>
+              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">3</div>
               <h2 className="text-xl font-bold text-slate-800">Baixar Relatório</h2>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => handleExportar('pdf')} disabled={exportando !== null} className="flex flex-col items-center justify-center gap-3 p-6 bg-white border-2 border-rose-100 hover:border-rose-500 rounded-3xl transition-all shadow-sm">
-                <FileText size={24} className="text-rose-600" />
-                <span className="font-bold text-rose-700 text-sm text-center">Baixar PDF</span>
+              <button 
+                onClick={() => handleExportar('pdf')} 
+                disabled={exportando !== null || !!semDados}
+                className="flex flex-col items-center justify-center gap-3 p-6 bg-white border-2 border-rose-100 hover:border-rose-400 hover:shadow-md rounded-3xl transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
+              >
+                <div className="w-12 h-12 bg-rose-50 group-hover:bg-rose-100 rounded-2xl flex items-center justify-center transition-colors">
+                  {exportando === 'pdf' 
+                    ? <Loader2 size={24} className="text-rose-500 animate-spin" />
+                    : <FileText size={24} className="text-rose-600" />
+                  }
+                </div>
+                <span className="font-bold text-rose-700 text-sm">Baixar PDF</span>
               </button>
-              <button onClick={() => handleExportar('excel')} disabled={exportando !== null} className="flex flex-col items-center justify-center gap-3 p-6 bg-white border-2 border-emerald-100 hover:border-emerald-500 rounded-3xl transition-all shadow-sm">
-                <FileSpreadsheet size={24} className="text-emerald-600" />
-                <span className="font-bold text-emerald-700 text-sm text-center">Baixar Excel</span>
+              <button 
+                onClick={() => handleExportar('excel')} 
+                disabled={exportando !== null || !!semDados}
+                className="flex flex-col items-center justify-center gap-3 p-6 bg-white border-2 border-emerald-100 hover:border-emerald-400 hover:shadow-md rounded-3xl transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
+              >
+                <div className="w-12 h-12 bg-emerald-50 group-hover:bg-emerald-100 rounded-2xl flex items-center justify-center transition-colors">
+                  {exportando === 'excel'
+                    ? <Loader2 size={24} className="text-emerald-500 animate-spin" />
+                    : <FileSpreadsheet size={24} className="text-emerald-600" />
+                  }
+                </div>
+                <span className="font-bold text-emerald-700 text-sm">Baixar Excel</span>
               </button>
             </div>
+
+            {semDados && (
+              <p className="text-center text-xs text-slate-400 font-medium mt-3">
+                Selecione um período com registros para habilitar o download.
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* =========================================================================
-          MODAL DE CALENDÁRIO PREMIUM (MESMA LÓGICA DA AGENDA)
-          ========================================================================= */}
+      {/* MODAL DE CALENDÁRIO */}
       {calendarioAberto && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
           <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl scale-in relative">
