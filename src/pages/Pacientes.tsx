@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { api } from '../services/api';
-import { Users, Plus, Search, Phone, Mail, FileText, Calendar, Trash2, Edit2, X, Save, ClipboardList, CheckCircle, Image as ImageIcon, Upload, ZoomIn, User, Check } from 'lucide-react';
+import { Users, Plus, Search, Phone, Mail, FileText, Calendar, Trash2, Edit2, X, Save, ClipboardList, Image as ImageIcon, Upload, ZoomIn, User, Check, Clock } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 interface Paciente { id: string; nome: string; cpf: string; telefone: string; email?: string; }
@@ -179,7 +179,6 @@ export function Pacientes() {
   }
 
   const pacientesFiltrados = pacientes.filter(p => p.nome.toLowerCase().includes(busca.toLowerCase()) || p.cpf.includes(busca));
-  const statusConfig: any = { CONCLUIDO: { cor: 'bg-emerald-100 text-emerald-700' }, FALTOU: { cor: 'bg-rose-100 text-rose-700' }, CANCELADO: { cor: 'bg-slate-100 text-slate-700' }, DEFAULT: { cor: 'bg-blue-100 text-blue-700' } };
 
   return (
     <div className="max-w-6xl mx-auto pb-10">
@@ -407,16 +406,29 @@ export function Pacientes() {
                     {pacienteDetalhado.agendamentos.length === 0 && <p className="text-slate-500 pl-10 pt-2 font-medium">Sem procedimentos registrados.</p>}
                     {[...pacienteDetalhado.agendamentos].sort((a, b) => new Date(b.data_inicio).getTime() - new Date(a.data_inicio).getTime()).map((ag) => {
                         const data = new Date(ag.data_inicio);
-                        const config = statusConfig[ag.status] || statusConfig['DEFAULT'];
+                        const isConcluido = ag.status === 'CONCLUIDO';
+                        const isNegativo = ag.status === 'FALTOU' || ag.status === 'CANCELADO';
+                        // Bolinha de status: verde com check (concluído), vermelha com X (faltou/cancelado), azul com relógio (pendente)
+                        const dotCor = isConcluido
+                          ? 'bg-emerald-500 border-emerald-500'
+                          : isNegativo
+                            ? 'bg-rose-500 border-rose-500'
+                            : 'bg-white border-blue-600';
                         return (
                           <div key={ag.id} className="relative pl-12">
-                            <div className="absolute left-0 top-1 w-8 h-8 bg-white border-2 border-blue-600 rounded-full flex items-center justify-center z-10 shadow-md"><CheckCircle size={16} className="text-blue-600" /></div>
-                            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-100 transition-colors relative group">
-                                <div className={`absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${config.cor}`}>{ag.status}</div>
-                                <div className="pr-16">
-                                  <p className="font-bold text-slate-800 text-base leading-tight group-hover:text-blue-600 transition-colors">{ag.servico.nome}</p>
-                                  <p className="text-sm text-blue-600 font-semibold mt-1">{data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}, {data.getFullYear()}</p>
-                                </div>
+                            <div
+                              className={`absolute left-0 top-1 w-8 h-8 rounded-full flex items-center justify-center z-10 shadow-md border-2 ${dotCor}`}
+                              title={ag.status}
+                            >
+                              {isConcluido
+                                ? <Check size={16} className="text-white" />
+                                : isNegativo
+                                  ? <X size={16} className="text-white" />
+                                  : <Clock size={14} className="text-blue-600" />}
+                            </div>
+                            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-100 transition-colors group">
+                                <p className="font-bold text-slate-800 text-base leading-tight group-hover:text-blue-600 transition-colors">{ag.servico.nome}</p>
+                                <p className="text-sm text-blue-600 font-semibold mt-1">{data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}, {data.getFullYear()}</p>
                             </div>
                           </div>
                         );
