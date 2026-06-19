@@ -57,6 +57,22 @@ export function Agenda() {
   const formatarDataInput = (data: Date) => {
     return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`;
   };
+
+  // Converte um instante (ISO/UTC vindo da API) para o relógio de parede de Brasília (-03:00),
+  // independente do fuso configurado no navegador.
+  const instanteBrasilia = (iso: string) => new Date(new Date(iso).getTime() - 3 * 60 * 60 * 1000);
+  const dataBrasiliaInput = (iso: string) => {
+    const b = instanteBrasilia(iso);
+    return `${b.getUTCFullYear()}-${String(b.getUTCMonth() + 1).padStart(2, '0')}-${String(b.getUTCDate()).padStart(2, '0')}`;
+  };
+  const horaBrasilia = (iso: string) => {
+    const b = instanteBrasilia(iso);
+    return `${String(b.getUTCHours()).padStart(2, '0')}:${String(b.getUTCMinutes()).padStart(2, '0')}`;
+  };
+  const dataCurtaBrasilia = (iso: string) => {
+    const b = instanteBrasilia(iso);
+    return `${String(b.getUTCDate()).padStart(2, '0')}/${String(b.getUTCMonth() + 1).padStart(2, '0')}`;
+  };
   const [dataFiltroPrincipal, setDataFiltroPrincipal] = useState(formatarDataInput(hoje));
 
   const dataMinima = formatarDataInput(hoje);
@@ -177,7 +193,8 @@ export function Agenda() {
       const servicoSelecionado = servicos.find(s => s.id === formData.servicoId);
       const duracao = servicoSelecionado?.duracao_minutos || 60;
 
-      const dataInicioObj = new Date(`${dataSelecionada}T${formData.horaSelecionada}:00`);
+      // Monta o instante com offset fixo de Brasília (-03:00) para não depender do fuso do navegador
+      const dataInicioObj = new Date(`${dataSelecionada}T${formData.horaSelecionada}:00-03:00`);
       const dataFimObj = new Date(dataInicioObj.getTime() + duracao * 60000);
 
       await api.post('/agendamento', {
@@ -243,7 +260,7 @@ export function Agenda() {
   };
 
   const agendamentosFiltrados = agendamentos
-    .filter(ag => ag.data_inicio.split('T')[0] === dataFiltroPrincipal)
+    .filter(ag => dataBrasiliaInput(ag.data_inicio) === dataFiltroPrincipal)
     .sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime()); 
 
   const dataFiltroObj = new Date(dataFiltroPrincipal + 'T12:00:00');
@@ -325,9 +342,8 @@ export function Agenda() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {agendamentosFiltrados.map((agendamento, index) => {
           const config = statusConfig[agendamento.status] || statusConfig['AGENDADO'];
-          const data = new Date(agendamento.data_inicio);
-          const hora = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-          const dataFormatada = data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+          const hora = horaBrasilia(agendamento.data_inicio);
+          const dataFormatada = dataCurtaBrasilia(agendamento.data_inicio);
 
           const delayClass = `delay-${Math.min((index + 2) * 100, 500)}`;
 
