@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { api } from '../services/api'; // Importamos nossa API
@@ -12,15 +12,12 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Inicialização síncrona: lê o token já na 1ª renderização, evitando que o
+  // PrivateRoute redirecione para o Login ao recarregar uma página interna (F5).
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => !!localStorage.getItem('@BioSchedule:token'),
+  );
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const token = localStorage.getItem('@BioSchedule:token');
-    if (token) {
-      setIsAuthenticated(true);
-    }
-  }, []);
 
   async function login(email: string, senha: string) {
     try {
